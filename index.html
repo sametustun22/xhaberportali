@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Haber Portalı</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="progress-bar"></div>
+
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <span class="logo-icon">📰</span>
+                    <span>X Haber Portalı</span>
+                </div>
+                
+                <div class="header-controls">
+                    <button id="read-later-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"></path></svg>
+                        <span class="hidden sm:inline">Listelerim</span> <!-- YENİ İSİM -->
+                        <span id="read-later-count" class="bg-white text-xs font-bold px-2 py-0.5 rounded-full text-blue-600">0</span>
+                    </button>
+                    <button id="settings-button" class="header-icon-button" title="Ayarlar">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    </button>
+                    <button id="theme-toggle-button" class="header-icon-button" title="Temayı Değiştir">
+                    </button>
+                </div>
+            </div>
+            <div class="controls-row">
+                <input type="text" id="search-input" placeholder="Haberlerde ara (Başlık veya Özet)...">
+            </div>
+        </div>
+    </header>
+
+    <main class="container main-content-padding">
+        
+        <section class="daily-summary">
+            <div class="summary-header">
+                <h2 class="section-title">Günün Öne Çıkan Başlıkları</h2>
+                <button id="listen-summary-button" class="summary-tts-button">
+                    <div class="spinner-small" style="display: none;"></div>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="play-icon"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="pause-icon" style="display:none;"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                    <span>Günü Dinle</span>
+                </button>
+            </div>
+            <span id="tts-status-summary" class="tts-status-summary">Özeti dinlemeye hazır.</span>
+            
+            <div class="voice-select-wrapper">
+                <label for="summary-voice-select" class="voice-select-label">Ses Seçimi:</label>
+                <select id="summary-voice-select" class="voice-select">
+                    <option value="">Varsayılan</option>
+                </select>
+            </div>
+
+            <ul class="summary-list" id="daily-summary">
+                 <div id="summary-loading-spinner"></div>
+            </ul>
+        </section>
+
+        <section>
+            <div class="controls-container">
+                <div class="categories" id="categories-container">
+                </div>
+                
+                <div class="controls-right-group">
+                    <div class="view-toggle-buttons">
+                        <button id="toggle-grid-view" class="view-toggle-btn active" title="Izgara Görünümü">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                        </button>
+                        <button id="toggle-list-view" class="view-toggle-btn" title="Liste Görünümü">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                        </button>
+                    </div>
+                    <!-- YENİ: Filtre Butonu -->
+                    <button id="filter-button" class="view-toggle-btn" title="Haberleri Filtrele">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+                    </button>
+                     <button id="refresh-button" class="view-toggle-btn" title="Kategoriyi Yenile">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="news-grid" id="news-grid">
+            </div>
+            
+            <p id="no-results" class="text-center text-secondary mt-8" style="display:none;">Arama kriterlerine uygun haber bulunamadı.</p>
+        </section>
+    </main>
+
+    <!-- Haber Detay Modalı -->
+    <div class="modal" id="news-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modal-title">Haber Başlığı</h3>
+                <button class="close-btn" id="close-news-modal">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                </div>
+        </div>
+    </div>
+    
+    <!-- Okuma Listesi Modalı (YENİ İSTATİSTİK SEKMESİ) -->
+    <div class="modal" id="read-later-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Listelerim</h3>
+                <button class="close-btn" id="close-read-later-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-tabs">
+                    <button class="modal-tab-btn active" data-tab="read-later-content">
+                        Okuma Listem
+                    </button>
+                    <button class="modal-tab-btn" data-tab="recently-viewed-content">
+                        Son Gözatılanlar
+                    </button>
+                    <button class="modal-tab-btn" data-tab="stats-content">
+                        İstatistikler 📊
+                    </button>
+                </div>
+
+                <div id="read-later-content" class="modal-tab-content active">
+                    <div id="read-later-list"></div>
+                    <p id="empty-list-message" class="text-secondary text-center italic mt-4" style="display:none;">Okuma listeniz boş.</p>
+                </div>
+                
+                <div id="recently-viewed-content" class="modal-tab-content">
+                    <div id="recently-viewed-list"></div>
+                    <p id="empty-recently-message" class="text-secondary text-center italic mt-4" style="display:none;">Son gezindiğiniz haber bulunmamakta.</p>
+                </div>
+                
+                <!-- YENİ: İstatistikler Sekmesi İçeriği -->
+                <div id="stats-content" class="modal-tab-content">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div id="stat-total-read" class="stat-value">0</div>
+                            <div class="stat-label">Toplam Okunan Haber</div>
+                        </div>
+                        <div class="stat-card">
+                            <div id="stat-read-streak" class="stat-value">0</div>
+                            <div class="stat-label">Okuma Serisi (Gün)</div>
+                        </div>
+                        <div class="stat-card-full">
+                            <div class="stat-label">En Çok Okunan Kategoriler</div>
+                            <ul id="stat-category-list" class="category-stat-list">
+                                <li class="text-secondary italic">Henüz veri yok.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+    
+    <!-- Ayarlar Modalı -->
+    <div class="modal" id="settings-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Ayarlar</h3>
+                <button class="close-btn" id="close-settings-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- YENİ: Tema Seçimi -->
+                <div class="settings-item-vertical">
+                    <div class="settings-label">
+                        <span>Görünüm Teması</span>
+                        <p>Site genelinde kullanılacak renk temasını seçin.</p>
+                    </div>
+                    <div id="theme-selector" class="theme-selector">
+                        <!-- Tema seçenekleri JavaScript ile yüklenecek -->
+                    </div>
+                </div>
+
+                <div class="settings-item">
+                    <div class="settings-label">
+                        <span>Veri Tasarruf Modu</span>
+                        <p>Görselleri gizle ve veriden tasarruf et.</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="data-saver-toggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                 <div class="settings-item">
+                    <div class="settings-label">
+                        <span>"Günün Özeti" Kategorisi</span>
+                        <p>Ana sayfadaki özet kutusu için kategori seçin.</p>
+                    </div>
+                    <select id="summary-category-select" class="voice-select" style="width: 100%; max-width: 200px;"></select>
+                </div>
+                
+                <div class="settings-item">
+                    <div class="settings-label">
+                        <span>Özet Haber Sayısı</span>
+                        <p>Ana sayfadaki özet kutusundaki haber sayısı.</p>
+                    </div>
+                    <select id="summary-count-select" class="voice-select" style="width: 100%; max-width: 100px;">
+                        <option value="3">3</option>
+                        <option value="5">5</option>
+                        <option value="8">8</option>
+                        <option value="10">10</option>
+                    </select>
+                </div>
+
+                <div class="settings-item-vertical">
+                    <div class="settings-label">
+                        <span>Kategori Yönetimi</span>
+                        <p>Kategorileri sürükleyerek sıralayın veya göster/gizle yapın.</p>
+                    </div>
+                    <ul id="category-management-list">
+                    </ul>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    
+    <!-- Haber Kaynakları Modalı -->
+    <div class="modal" id="sources-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Haber Kaynakları</h3>
+                <button class="close-btn" id="close-sources-modal">&times;</button>
+            </div>
+            <div class="modal-body" id="sources-modal-body">
+            </div>
+        </div>
+    </div>
+
+    <!-- YENİ: Öğretici Modalı -->
+    <div class="modal" id="tutorial-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Siteye Hoş Geldiniz!</h3>
+                <button class="close-btn" id="close-tutorial-modal">&times;</button>
+            </div>
+            <div class="modal-body" id="tutorial-body">
+                <!-- Öğretici adımları buraya gelecek -->
+            </div>
+            <div class="modal-footer" style="padding: 1rem; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color);">
+                <div class="tutorial-controls-left">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="dont-show-tutorial-again" style="margin-right: 0.5rem;">
+                        <span>Bir daha gösterme</span>
+                    </label>
+                </div>
+                <div class="tutorial-controls-right" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span id="tutorial-step-indicator"></span>
+                    <button id="tutorial-prev-btn" class="view-toggle-btn" style="display: none;">Geri</button>
+                    <button id="tutorial-next-btn" class="view-toggle-btn active">İleri</button>
+                    <button id="tutorial-finish-btn" class="view-toggle-btn active" style="display: none;">Bitir</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <button id="back-to-top" title="Yukarı Dön">🔼</button>
+    
+    <footer>
+        <div class="container">
+            <p>&copy; 2023 Modern Haber Portalı - Tüm hakları saklıdır.</p>
+            <button id="show-sources-btn">Haber Kaynakları</button>
+        </div>
+    </footer>
+
+    <script src="script.js" defer></script>
+</body>
+</html>
