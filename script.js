@@ -1,12 +1,5 @@
 
         const PROXY_URL = 'https://api.rss2json.com/v1/api.json?rss_url=';
-
-// YENİ: İstemci taraflı çekme için çoklu proxy listesi
-const CORS_PROXIES = [
-    'https://api.allorigins.win/get?url=',
-    'https://cors.proxy.consumet.org/' // corsproxy.io yerine daha stabil bir alternatif
-];
-let lastUsedProxyIndex = 0;
         
         const READ_LATER_KEY = 'readLaterItems'; 
         const RECENTLY_VIEWED_KEY = 'recentlyViewedItems';
@@ -42,16 +35,6 @@ let lastUsedProxyIndex = 0;
             health: 'Sağlık',
             entertainment: 'Magazin'
         };
-
-// YENİ: Tam metin çekmek için siteye özel seçiciler (selectors)
-const articleContentSelectors = {
-    'hurriyet.com.tr': '.article-body__text', // GÜNCELLENDİ
-    'ntv.com.tr': '.content-text', // Bu doğru, dokunmuyoruz
-    'donanimhaber.com': '.content-text', // Bu doğru, dokunmuyoruz
-    'dunya.com': '.content-body', // GÜNCELLENDİ
-    // Diğer siteler için de buraya eklenebilir.
-    'default': 'article, .article, .story, .post, .content' // Genel yedek seçiciler
-};
 
 
         // DOM Elementleri
@@ -392,57 +375,6 @@ const articleContentSelectors = {
             }
         }
         
-        // ---------- TAM METİN ÇEKME (YENİ) ----------
-
-        // YENİ: Zaman aşımlı fetch fonksiyonu
-        async function fetchWithTimeout(resource, options = {}, timeout = 7000) { // Zaman aşımı 7 saniye
-            const controller = new AbortController();
-            const id = setTimeout(() => controller.abort(), timeout);
-            const response = await fetch(resource, {
-                ...options,
-                signal: controller.signal  
-            });
-            clearTimeout(id);
-            return response;
-        }
-
-        // YENİ YÖNTEM: İçeriği istemci tarafından, çoklu proxy desteği ile çekme
-        async function fetchFullArticle(articleUrl) {
-            if (!articleUrl) return null;
-
-            // Her denemede farklı bir proxy ile başla
-            for (let i = 0; i < CORS_PROXIES.length; i++) {
-                const proxyIndex = (lastUsedProxyIndex + i) % CORS_PROXIES.length;
-                const proxyUrl = `${CORS_PROXIES[proxyIndex]}${encodeURIComponent(articleUrl)}`;
-                
-                try {
-                    const response = await fetchWithTimeout(proxyUrl);
-                    if (!response.ok) throw new Error(`Proxy yanıtı başarısız: ${response.status}`);
-
-                    const data = await response.json();
-                    const html = data.contents;
-                    if (!html) throw new Error('Proxy\'den boş içerik döndü.');
-
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-
-                    const domain = new URL(articleUrl).hostname.replace('www.', '');
-                    const selector = articleContentSelectors[Object.keys(articleContentSelectors).find(key => domain.includes(key))] || articleContentSelectors.default;
-
-                    const articleBody = doc.querySelector(selector);
-
-                    if (articleBody) {
-                        articleBody.querySelectorAll('script, style, .ads, .ad, .social-share, .related-content, .comments').forEach(el => el.remove());
-                        lastUsedProxyIndex = proxyIndex; // Başarılı proxy'yi hatırla
-                        return articleBody.innerHTML;
-                    }
-                } catch (error) {
-                    console.warn(`Proxy (${CORS_PROXIES[proxyIndex]}) ile çekme hatası:`, error.name === 'AbortError' ? 'Zaman aşımı' : error.message);
-                }
-            }
-            return null; // Tüm proxy'ler başarısız oldu
-        }
-
         // ---------- KİŞİSELLEŞTİRİLMİŞ AKIŞ ("SİZİN İÇİN") (YENİ) ----------
 
         async function getAllFeeds(force = false) {
@@ -786,117 +718,12 @@ const articleContentSelectors = {
             newsModal.style.display = 'block';
              document.body.style.overflow = 'hidden'; 
 
-            // 1. ADIM: Modal'ı RSS özetiyle anında göster
-            const readLaterItems = loadReadLaterItems();
-            const isSaved = readLaterItems.some(savedItem => savedItem.id === item.id);
-            const relatedNews = findRelatedNews(item, allNewsItems, 3);
-            const relatedNewsHTML = renderRelatedNews(relatedNews);
-
-            modalBody.innerHTML = `
-                <div id="tts-controls" class="tts-controls">
-                     <button id="tts-button" class="tts-button" ${!window.speechSynthesis ? 'disabled' : ''}>
-                       <div class="spinner-small" style="display: none;"></div>
-                       <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="play-icon"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                       <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="pause-icon" style="display:none;"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
-                       <span>Oku</span>
-                    </button>
-                    <span id="tts-status" class="tts-status">Okumaya hazır.</span>
-                    <div class="font-controls">
-                        <span class="font-size-label">Yazı Boyutu:</span>
-                        <button id="font-decrease-btn" class="font-btn">-</button>
-                        <button id="font-increase-btn" class="font-btn">+</button>
-                    </div>
-                </div>
-                
-                <div class="tts-controls" style="padding-top: 0; border-top: 0;">
-                    <button id="share-button">
-                       <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
-                       <span>Paylaş</span>
-                    </button>
-                     <button id="zen-mode-toggle">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
-                       <span>Zen Modu</span>
-                    </button>
-                </div>
-
-                <img src="${item.imageUrl}" alt="${item.title}" class="modal-image" onerror="this.src='https://placehold.co/800x400/2563eb/ffffff?text=Haber'; this.style.display='none';">
-                <p class="modal-date">Yayınlanma: ${new Date(item.pubDate).toLocaleString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-                
-                <!-- YENİ: Tam metin yükleme durumu -->
-                <div id="full-text-status" class="full-text-status">
-                    <div class="spinner-small" style="border-left-color: var(--primary);"></div>
-                    <span>Tam metin yükleniyor...</span>
-                </div>
-
-                <!-- YENİ: Tam metin çekilemezse gösterilecek kontroller -->
-                <div id="full-text-fallback" class="full-text-fallback-controls">
-                    <p>Haberin tam metni yüklenemedi.</p>
-                    <div class="fallback-buttons"></div>
-                </div>
-
-                <div class="modal-text" style="font-size:${globalModalFontSize}rem;">${highlightLinks(item.cleanFullText)}</div>
-                ${relatedNewsHTML}
-            `;
-
-            // 2. ADIM: Modal içi butonlara olay dinleyicileri ata
-            const ttsButton = document.getElementById('tts-button');
-            if (ttsButton) {
-                ttsButton.addEventListener('click', () => {
-                    const contentEl = document.querySelector('#modal-body .modal-text');
-                    const textToRead = item.title + ". " + removeHtmlTags(contentEl.innerHTML);
-                    playText(textToRead, 'tts-button', 'tts-status');
-                });
-            }
-            document.getElementById('font-decrease-btn').addEventListener('click', () => changeFontSize(-0.1));
-            document.getElementById('font-increase-btn').addEventListener('click', () => changeFontSize(0.1));
-            document.getElementById('share-button').addEventListener('click', () => shareNews(item));
-            document.getElementById('zen-mode-toggle').addEventListener('click', toggleZenMode);
-
-            // 3. ADIM: Arka planda tam metni çek ve içeriği güncelle
-            (async () => {
-                const fullArticleHTML = await fetchFullArticle(item.link);
-                const statusDiv = document.getElementById('full-text-status'); // Yükleniyor bildirimi
-                const fallbackDiv = document.getElementById('full-text-fallback'); // Hata durumu kontrolleri
-                
-                if (fullArticleHTML) {
-                    const modalTextDiv = document.querySelector('#modal-body .modal-text');
-                    if (modalTextDiv) {
-                        modalTextDiv.innerHTML = fullArticleHTML;
-                    }
-                    if (statusDiv) statusDiv.classList.add('hidden');
-                } else {
-                    // Başarısız olduysa, alternatif butonları göster
-                    if (statusDiv) statusDiv.classList.add('hidden');
-                    if (fallbackDiv) {
-                        fallbackDiv.style.display = 'block';
-                        const fallbackButtonsContainer = fallbackDiv.querySelector('.fallback-buttons');
-                        fallbackButtonsContainer.innerHTML = `
-                            <button class="tts-button fallback-btn" onclick="window.open('${item.link}', '_blank')">
-                                Kaynakta Oku
-                            </button>
-                            <button class="tts-button fallback-btn" style="background-color: var(--secondary);" onclick="document.getElementById('close-news-modal').click(); openNewsModal(JSON.parse(this.dataset.item))" data-item='${JSON.stringify(item).replace(/'/g, '&#39;')}'>
-                                Yeniden Dene
-                            </button>
-                        `;
-                    }
-                }
-            })();
-
-            // --- Eski Kod Bloğu ---
-            /* (async () => {
-                let finalContent = highlightLinks(item.cleanFullText); // Varsayılan içerik
-                
-                // Tam metni çekmeyi dene
-                const fullArticleHTML = await fetchFullArticle(item.link);
-                if (fullArticleHTML) {
-                    finalContent = fullArticleHTML; // Başarılı olursa tam metni kullan
-                }
-
+            // İçerik yüklemesi
+            setTimeout(() => {
                 const readLaterItems = loadReadLaterItems();
                 const isSaved = readLaterItems.some(savedItem => savedItem.id === item.id);
 
                 // İlgili haberleri bul ve HTML'ini oluştur
-                // Not: Tam metin çekme işlemi yavaş olabileceğinden, ilgili haberler RSS verisine göre bulunur.
                 const relatedNews = findRelatedNews(item, allNewsItems, 3);
                 const relatedNewsHTML = renderRelatedNews(relatedNews);
                 
@@ -929,7 +756,7 @@ const articleContentSelectors = {
 
                     <img src="${item.imageUrl}" alt="${item.title}" class="modal-image" onerror="this.src='https://placehold.co/800x400/2563eb/ffffff?text=Haber'; this.style.display='none';">
                     <p class="modal-date">Yayınlanma: ${new Date(item.pubDate).toLocaleString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-                    <div class="modal-text" style="font-size:${globalModalFontSize}rem;">${finalContent}</div>
+                    <div class="modal-text" style="font-size:${globalModalFontSize}rem;">${highlightLinks(item.cleanFullText)}</div>
                     ${relatedNewsHTML}
                 `;
                 
@@ -937,7 +764,7 @@ const articleContentSelectors = {
                 const ttsButton = document.getElementById('tts-button'); 
                 if (ttsButton) {
                     ttsButton.addEventListener('click', () => {
-                         const textToRead = item.title + ". " + removeHtmlTags(finalContent); // HTML'i temizleyip oku
+                         const textToRead = item.title + ". " + item.cleanFullText;
                          playText(textToRead, 'tts-button','tts-status');
                     });
                 }
@@ -947,7 +774,7 @@ const articleContentSelectors = {
                 document.getElementById('share-button').addEventListener('click', () => shareNews(item));
                 document.getElementById('zen-mode-toggle').addEventListener('click', toggleZenMode);
 
-            })(); */
+            }, 200); 
             
             const newsCard = newsGrid.querySelector(`.news-card[data-id="${item.id}"]`);
             if (newsCard) {
@@ -1535,8 +1362,6 @@ const articleContentSelectors = {
         }
         
         function playText(text, buttonId, statusId, voiceSelectEl = null) {
-            stopCurrentAudio(); // YENİ: Her yeni okuma öncesi eskisini kesin olarak durdur
-
             const button = document.getElementById(buttonId);
             const status = document.getElementById(statusId);
             const playIcon = button.querySelector('.play-icon');
@@ -1561,6 +1386,8 @@ const articleContentSelectors = {
                 return;
             }
             
+            stopCurrentAudio(); 
+
             summaryUtterance = new SpeechSynthesisUtterance(text);
 
             if (voiceSelectEl && voiceSelectEl.value) {
