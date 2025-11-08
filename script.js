@@ -1,5 +1,12 @@
 
         const PROXY_URL = 'https://api.rss2json.com/v1/api.json?rss_url=';
+
+// YENİ: İstemci taraflı çekme için çoklu proxy listesi
+const CORS_PROXIES = [
+    'https://api.allorigins.win/get?url=',
+    'https://corsproxy.io/?'
+];
+let lastUsedProxyIndex = 0;
         
         const READ_LATER_KEY = 'readLaterItems'; 
         const RECENTLY_VIEWED_KEY = 'recentlyViewedItems';
@@ -399,37 +406,41 @@ const articleContentSelectors = {
             return response;
         }
 
-        // YENİ YÖNTEM: İçeriği istemci tarafından, allorigins proxy'si ile çekme
+        // YENİ YÖNTEM: İçeriği istemci tarafından, çoklu proxy desteği ile çekme
         async function fetchFullArticle(articleUrl) {
             if (!articleUrl) return null;
 
-            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(articleUrl)}`;
+            // Her denemede farklı bir proxy ile başla
+            for (let i = 0; i < CORS_PROXIES.length; i++) {
+                const proxyIndex = (lastUsedProxyIndex + i) % CORS_PROXIES.length;
+                const proxyUrl = `${CORS_PROXIES[proxyIndex]}${encodeURIComponent(articleUrl)}`;
+                
+                try {
+                    const response = await fetchWithTimeout(proxyUrl);
+                    if (!response.ok) throw new Error(`Proxy yanıtı başarısız: ${response.status}`);
 
-            try {
-                const response = await fetchWithTimeout(proxyUrl);
-                if (!response.ok) throw new Error(`Proxy yanıtı başarısız: ${response.status}`);
+                    const data = await response.json();
+                    const html = data.contents;
+                    if (!html) throw new Error('Proxy\'den boş içerik döndü.');
 
-                const data = await response.json();
-                const html = data.contents;
-                if (!html) throw new Error('Proxy\'den boş içerik döndü.');
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
 
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
+                    const domain = new URL(articleUrl).hostname.replace('www.', '');
+                    const selector = articleContentSelectors[Object.keys(articleContentSelectors).find(key => domain.includes(key))] || articleContentSelectors.default;
 
-                const domain = new URL(articleUrl).hostname.replace('www.', '');
-                const selector = articleContentSelectors[Object.keys(articleContentSelectors).find(key => domain.includes(key))] || articleContentSelectors.default;
+                    const articleBody = doc.querySelector(selector);
 
-                const articleBody = doc.querySelector(selector);
-
-                if (articleBody) {
-                    articleBody.querySelectorAll('script, style, .ads, .ad, .social-share, .related-content, .comments').forEach(el => el.remove());
-                    return articleBody.innerHTML;
+                    if (articleBody) {
+                        articleBody.querySelectorAll('script, style, .ads, .ad, .social-share, .related-content, .comments').forEach(el => el.remove());
+                        lastUsedProxyIndex = proxyIndex; // Başarılı proxy'yi hatırla
+                        return articleBody.innerHTML;
+                    }
+                } catch (error) {
+                    console.warn(`Proxy (${CORS_PROXIES[proxyIndex]}) ile çekme hatası:`, error.name === 'AbortError' ? 'Zaman aşımı' : error.message);
                 }
-                return null; // Seçici bulunamadı
-            } catch (error) {
-                console.warn(`İstemci taraflı içerik çekme hatası:`, error.name === 'AbortError' ? 'Zaman aşımı' : error.message);
-                return null;
             }
+            return null; // Tüm proxy'ler başarısız oldu
         }
 
         // ---------- KİŞİSELLEŞTİRİLMİŞ AKIŞ ("SİZİN İÇİN") (YENİ) ----------
@@ -817,6 +828,12 @@ const articleContentSelectors = {
                     <span>Tam metin yükleniyor...</span>
                 </div>
 
+                <!-- YENİ: Tam metin çekilemezse gösterilecek kontroller -->
+                <div id="full-text-fallback" class="full-text-fallback-controls">
+                    <p>Haberin tam metni yüklenemedi.</p>
+                    <div class="fallback-buttons"></div>
+                </div>
+
                 <div class="modal-text" style="font-size:${globalModalFontSize}rem;">${highlightLinks(item.cleanFullText)}</div>
                 ${relatedNewsHTML}
             `;
@@ -838,18 +855,29 @@ const articleContentSelectors = {
             // 3. ADIM: Arka planda tam metni çek ve içeriği güncelle
             (async () => {
                 const fullArticleHTML = await fetchFullArticle(item.link);
-                const statusDiv = document.getElementById('full-text-status');
+                const statusDiv = document.getElementById('full-text-status'); // Yükleniyor bildirimi
+                const fallbackDiv = document.getElementById('full-text-fallback'); // Hata durumu kontrolleri
                 
                 if (fullArticleHTML) {
                     const modalTextDiv = document.querySelector('#modal-body .modal-text');
                     if (modalTextDiv) {
                         modalTextDiv.innerHTML = fullArticleHTML;
                     }
-                    if (statusDiv) statusDiv.classList.add('hidden'); // Yükleme bildirimini gizle
+                    if (statusDiv) statusDiv.classList.add('hidden');
                 } else {
-                    if (statusDiv) {
-                        // Tam metin çekilemediyse bildirimi kaldır
-                        statusDiv.classList.add('hidden');
+                    // Başarısız olduysa, alternatif butonları göster
+                    if (statusDiv) statusDiv.classList.add('hidden');
+                    if (fallbackDiv) {
+                        fallbackDiv.style.display = 'block';
+                        const fallbackButtonsContainer = fallbackDiv.querySelector('.fallback-buttons');
+                        fallbackButtonsContainer.innerHTML = `
+                            <button class="tts-button fallback-btn" onclick="window.open('${item.link}', '_blank')">
+                                Kaynakta Oku
+                            </button>
+                            <button class="tts-button fallback-btn" style="background-color: var(--secondary);" onclick="document.getElementById('close-news-modal').click(); openNewsModal(JSON.parse(this.dataset.item))" data-item='${JSON.stringify(item)}'>
+                                Yeniden Dene
+                            </button>
+                        `;
                     }
                 }
             })();
@@ -1507,6 +1535,8 @@ const articleContentSelectors = {
         }
         
         function playText(text, buttonId, statusId, voiceSelectEl = null) {
+            stopCurrentAudio(); // YENİ: Her yeni okuma öncesi eskisini kesin olarak durdur
+
             const button = document.getElementById(buttonId);
             const status = document.getElementById(statusId);
             const playIcon = button.querySelector('.play-icon');
@@ -1531,8 +1561,6 @@ const articleContentSelectors = {
                 return;
             }
             
-            stopCurrentAudio(); 
-
             summaryUtterance = new SpeechSynthesisUtterance(text);
 
             if (voiceSelectEl && voiceSelectEl.value) {

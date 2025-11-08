@@ -1481,6 +1481,28 @@
             overflow: hidden;
         }
 
+        /* YENİ: Tam Metin Başarısız Olduğunda Gösterilecek Butonlar */
+        .full-text-fallback-controls {
+            display: none; /* Varsayılan olarak gizli */
+            background-color: var(--light-bg);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        .full-text-fallback-controls p {
+            margin-bottom: 1rem;
+            font-weight: 500;
+        }
+        .fallback-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+        .fallback-btn {
+            padding: 0.6rem 1.2rem;
+        }
+
         /* YENİ: İlgili Haberler Stilleri */
         .related-news-container {
             margin-top: 2.5rem;
