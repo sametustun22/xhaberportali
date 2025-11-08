@@ -4,7 +4,7 @@
 // YENİ: İstemci taraflı çekme için çoklu proxy listesi
 const CORS_PROXIES = [
     'https://api.allorigins.win/get?url=',
-    'https://corsproxy.io/?'
+    'https://cors.proxy.consumet.org/' // corsproxy.io yerine daha stabil bir alternatif
 ];
 let lastUsedProxyIndex = 0;
         
@@ -874,7 +874,7 @@ const articleContentSelectors = {
                             <button class="tts-button fallback-btn" onclick="window.open('${item.link}', '_blank')">
                                 Kaynakta Oku
                             </button>
-                            <button class="tts-button fallback-btn" style="background-color: var(--secondary);" onclick="document.getElementById('close-news-modal').click(); openNewsModal(JSON.parse(this.dataset.item))" data-item='${JSON.stringify(item)}'>
+                            <button class="tts-button fallback-btn" style="background-color: var(--secondary);" onclick="document.getElementById('close-news-modal').click(); openNewsModal(JSON.parse(this.dataset.item))" data-item='${JSON.stringify(item).replace(/'/g, '&#39;')}'>
                                 Yeniden Dene
                             </button>
                         `;
