@@ -388,7 +388,7 @@ const articleContentSelectors = {
         // ---------- TAM METİN ÇEKME (YENİ) ----------
 
         // YENİ: Zaman aşımlı fetch fonksiyonu
-        async function fetchWithTimeout(resource, options = {}, timeout = 8000) { // Zaman aşımını 8 saniyeye çıkardık
+        async function fetchWithTimeout(resource, options = {}, timeout = 7000) { // Zaman aşımı 7 saniye
             const controller = new AbortController();
             const id = setTimeout(() => controller.abort(), timeout);
             const response = await fetch(resource, {
@@ -399,26 +399,25 @@ const articleContentSelectors = {
             return response;
         }
 
+        // YENİ YÖNTEM: İçeriği istemci tarafından, allorigins proxy'si ile çekme
         async function fetchFullArticle(articleUrl) {
             if (!articleUrl) return null;
 
-            // Kendi sunucumuza istek atıyoruz.
-            const requestUrl = `/api/fetch-article?url=${encodeURIComponent(articleUrl)}`;
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(articleUrl)}`;
 
             try {
-                const response = await fetchWithTimeout(requestUrl);
-                if (!response.ok) throw new Error(`Sunucu yanıtı başarısız: ${response.status}`);
+                const response = await fetchWithTimeout(proxyUrl);
+                if (!response.ok) throw new Error(`Proxy yanıtı başarısız: ${response.status}`);
 
-                const html = await response.text();
-                if (!html) throw new Error('Sunucudan boş içerik döndü.');
+                const data = await response.json();
+                const html = data.contents;
+                if (!html) throw new Error('Proxy\'den boş içerik döndü.');
 
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
 
                 const domain = new URL(articleUrl).hostname.replace('www.', '');
-                const selector = Object.keys(articleContentSelectors).find(key => domain.includes(key)) 
-                    ? articleContentSelectors[Object.keys(articleContentSelectors).find(key => domain.includes(key))]
-                    : articleContentSelectors.default;
+                const selector = articleContentSelectors[Object.keys(articleContentSelectors).find(key => domain.includes(key))] || articleContentSelectors.default;
 
                 const articleBody = doc.querySelector(selector);
 
@@ -426,12 +425,11 @@ const articleContentSelectors = {
                     articleBody.querySelectorAll('script, style, .ads, .ad, .social-share, .related-content, .comments').forEach(el => el.remove());
                     return articleBody.innerHTML;
                 }
+                return null; // Seçici bulunamadı
             } catch (error) {
-                console.warn(`Sunucu taraflı içerik çekme hatası:`, error.name === 'AbortError' ? 'Zaman aşımı' : error.message);
+                console.warn(`İstemci taraflı içerik çekme hatası:`, error.name === 'AbortError' ? 'Zaman aşımı' : error.message);
+                return null;
             }
-
-            console.error(`Sunucu taraflı içerik çekilemedi: ${articleUrl}`);
-            return null; // Tüm proxy'ler başarısız oldu
         }
 
         // ---------- KİŞİSELLEŞTİRİLMİŞ AKIŞ ("SİZİN İÇİN") (YENİ) ----------
